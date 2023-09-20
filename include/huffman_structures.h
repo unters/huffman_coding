@@ -51,10 +51,17 @@ struct _canonical_huffman_codebook {
     _prefix_code ** codes;
 };
 
+struct _pair {
+    char c;
+    uint8_t length;
+};
+
+struct _ordered_pairs_list {
+    _pair ** data;
+};
+
 struct _prefix_code {
     uint8_t * data;
-    /* Number of bytes in data array.  */
-    uint8_t bytes;
     /* Number of significant bits.  */
     uint8_t length;
 };
@@ -78,6 +85,8 @@ typedef struct _heap                        _heap;
 typedef struct _queue                       _queue;
 typedef struct _prefix_code                 _prefix_code;
 typedef struct _codes_queue                 _codes_queue;
+typedef struct _pair                        _pair;
+typedef struct _ordered_pairs_list          _ordered_pairs_list;
 
 
 
@@ -137,6 +146,9 @@ _enqueue(_queue *, _huffman_tree_node *);
 _huffman_tree_node *
 _dequeue(_queue *);
 
+void
+_delete_queue(_queue * q, bool delete_contents);
+
 
 
 /* Huffman codes lengths map functions.  */
@@ -145,7 +157,7 @@ _huffman_codes_lengths_map *
 _evaluate_huffman_codes_lengths(_huffman_tree *);
 
 void
-_delete_huffman_codes_lengths_map();
+_delete_huffman_codes_lengths_map(_huffman_codes_lengths_map *);
 
 
 
@@ -159,45 +171,51 @@ _delete_canonical_huffman_codebook(_canonical_huffman_codebook *);
 
 
 
-// /* Canonical huffman codebook functions.  */
+/* _pair functions.  */
 
-// _huffman_codes_lengths_map *
-// _initialize_canonical_huffman_codebook(uint8_t);
+_pair *
+_create_pair(char, uint8_t);
 
-// _huffman_codes_lengths_map *
-// _create_canonical_huffman_codebook(_huffman_tree *);
+/* Returns true if p1 is less than p2.  */
+bool
+_compare_pairs(_pair * p1, _pair * p2);
 
-// void
-// _sort_canonical_huffman_codebook(_huffman_codes_lengths_map *);
+void
+_swap_pairs(_pair *, _pair *);
 
-// void
-// _delete_canonical_huffman_codebook();
+void
+_qsort(_ordered_pairs_list *);
 
 
 
-// /* Huffman codes list functions.  */
+/* _ordered_pairs_list functions.  */
 
-// _canonical_huffman_codebook *
-// _initialize_huffman_codes_list();
+_ordered_pairs_list *
+_create_ordered_pairs_list(_huffman_codes_lengths_map *);
 
-// _canonical_huffman_codebook *
-// _create_huffman_codes_list(_huffman_codes_lengths_map *);
+void
+_delete_ordered_pairs_list(_ordered_pairs_list * pl, bool delete_contents);
 
 
 
 /* Prefix code functions.  */
 
+/* Intitialize _prefix_code structure capable of holding code of given
+ * length.  */
 _prefix_code *
-_initialize_prefix_code(uint8_t);
+_initialize_prefix_code(uint8_t length);
 
+/* Create canonical huffman code of length `length` that follows prefix
+ * code `prev`.  */
 _prefix_code *
-_duplicate_prefix_code(_prefix_code *);
+_generate_next_prefix_code(_prefix_code * prev, uint8_t length);
 
 void
-_delete_prefix_code(_prefix_code * c);
+_delete_prefix_code(_prefix_code *);
 
 
 
+// STATUS: DEPRECATED.
 /* Codes queue functions.  */
 
 _codes_queue *
@@ -211,24 +229,3 @@ _enqueue_code(_codes_queue *, _prefix_code *);
 
 _prefix_code *
 _dequeue_code(_codes_queue *);
-
-
-
-/* Other.  */
-
-void
-_swap(_huffman_tree_node *, _huffman_tree_node *);
-
-
-
-/* Temporary.  */
-
-/* Recursively fill array of huffman codes "codes". depth stands for n'th 
- * node height (counting from top). path stores bits representing path to
- * node n in huffman tree. memb_size represents number of bytes, needed to 
- * store longest huffman code for given huffman tree.  */
-static void
-_get_huffman_codes(struct _huffman_tree_node * n, uint8_t *** codes,
-    uint8_t * path, uint8_t depth, uint8_t memb_size);
-
-#endif

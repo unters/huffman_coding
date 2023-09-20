@@ -59,7 +59,8 @@ _height(_huffman_tree_node * n) {
 
 
 
-/* Heap functions (STATUS: verified). */
+// STATUS: verified.
+/* Heap functions.  */
 
 _heap *
 _initialize_heap() {
@@ -198,7 +199,19 @@ _dequeue(_queue * q) {
 }
 
 
+void
+_delete_queue(_queue * q, bool delete_contents) {
+    assert(q != NULL);
+    if (delete_contents == true)
+        for (int i = 0; i < 256; ++i)
+            free(q->data[i]);
+    free(q->data);
+    free(q);
+}
 
+
+
+// STATUS: Done?
 /* Huffman codes lengths map functions.  */
 
 _huffman_codes_lengths_map *
@@ -208,74 +221,79 @@ _evaluate_huffman_codes_lengths(_huffman_tree * t) {
     cl->lengths = calloc(256, 1);
     memset(cl->lengths, 0, 256);
 
-    /* ... */
+    _queue * q = _initialize_queue();
+    _enqueue(q, t->root);
+    int length = 0;
+    while(_queue_is_empty(q) == false) {
+        uint8_t size = q->size;
+        while(size--) {
+            _huffman_tree_node * n = _dequeue(q);
+            if (n->left == NULL) {
+                char c = n->key;
+                cl->lengths[c] = length;
+            }
+
+            else {
+                _enqueue(q, n->left);
+                _enqueue(q, n->right);
+            }
+        }
+
+        ++length;
+    }
+
+    _delete_queue(q, false);
+    return cl;
 }
 
+
 void
-_delete_huffman_codes_lengths_map();
+_delete_huffman_codes_lengths_map(_huffman_codes_lengths_map * cl) {
+    free(cl->lengths);
+    free(cl);
+}
 
 
 
 /* Canonical huffman codebook functions.  */
 
 _canonical_huffman_codebook *
-_create_canonical_huffman_codebook(_huffman_codes_lengths_map *);
+_create_canonical_huffman_codebook(_huffman_codes_lengths_map * cl) {
+    _canonical_huffman_codebook * cb = \
+        calloc(1, sizeof(_canonical_huffman_codebook));
+    cb->codes = calloc(256, sizeof(_prefix_code *));
+    memset(cb->codes, NULL, 256 * sizeof(_prefix_code *));
 
+    /* Order code lengths first by length and secondly by alphabetical
+     * value.  */
+    _ordered_pairs_list * pl = _create_ordered_pairs_list(cl);
+    
+    uint16_t zero_count = 0;
+    while(zero_count != 256 && pl->data[zero_count]->length == 0)
+        ++zero_count;
+    assert(zero_count != 256);    
+
+    /* Build canonical codes, starting from first character with non-zero
+     * length.  */
+    _pair * p = pl->data[zero_count];
+    cb->codes[p->c] = _initialize_prefix_code(p->length);
+    for (uint16_t i = zero_count + 1; i < 256; ++i) {
+        _pair * prev_p = pl->data[i - 1];
+        _pair * curr_p = pl->data[i];
+        _prefix_code * prev_code = cb->codes[prev_p->c];
+        _prefix_code * curr_code = \
+            _generate_next_prefix_code(prev_code, curr_p->length);
+        cb->codes[curr_p->c] = curr_code;
+    }
+
+    _delete_ordered_pairs_list(pl, true);
+    return cb;
+}
+
+
+// STATUS: TODO.
 void
 _delete_canonical_huffman_codebook(_canonical_huffman_codebook *);
-
-
-
-// // STATUS: todo.
-// /* Huffman codes list and canonical huffman codebook functions.  */
-
-// /* TODO.  */
-// _huffman_codes_lengths_map *
-// _initialize_canonical_huffman_codebook(uint8_t b) {
-//     _huffman_codes_lengths_map * cb = \
-//         calloc(1, sizeof(_huffman_codes_lengths_map));
-    
-//     return cb;
-// }
-
-
-// /* TODO.  */
-// _huffman_codes_lengths_map *
-// _create_canonical_huffman_codebook(_huffman_tree * t) {
-
-// }
-
-
-// void
-// _sort_canonical_huffman_codebook(_huffman_codes_lengths_map * cb) {
-
-// }
-
-
-
-// // STATUS: TODO.
-// /* Huffman codes lists functions.  */
-
-// _canonical_huffman_codebook *
-// _initialize_huffman_codes_list() {
-//     _canonical_huffman_codebook * cl = calloc(1, sizeof(_canonical_huffman_codebook));
-//     cl->codes = calloc(256, sizeof(_prefix_code *));
-//     return cl;
-// }
-
-
-// _canonical_huffman_codebook *
-// _create_huffman_codes_list(_huffman_codes_lengths_map * cb) {
-//     _canonical_huffman_codebook * cl = \
-//         _initialize_huffman_codes_list();
-
-//     for (int i = 0; i < 256; ++i) {
-//         size_t index = cb->alphabet[i];
-//         cl->codes[index] = cb->codes[i];
-//     }
-    
-//     return cl;
-// }
 
 
 
@@ -283,25 +301,30 @@ _delete_canonical_huffman_codebook(_canonical_huffman_codebook *);
 /* Prefix code functions.  */
 
 _prefix_code *
-_initialize_prefix_code(uint8_t bytes) {
+_initialize_prefix_code(uint8_t length) {
+    uint8_t bytes = length / 8 + (length % 8 == 0 ? 0 : 1);
     _prefix_code * c = calloc(1, sizeof(_prefix_code));
-    c->bytes     = bytes;
-    c->length    = 0;
-    c->data      = calloc(bytes, 1);
+    c->data = calloc(bytes, 1);
+    c->length = length;
     memset(c->data, 0, bytes);
     return c;
 }
 
 
 _prefix_code *
-_duplicate_prefix_code(_prefix_code * c) {
-    _prefix_code * cd = calloc(1, sizeof(_prefix_code));
-    cd->bytes = c->bytes;
-    cd->length = c->length;
-    cd->data = calloc(c->bytes, 1);
-    for (uint8_t i = 0; i < cd->bytes; ++i)
-        cd->data[i] = c->data[i];
-    return cd;
+_generate_next_prefix_code(_prefix_code * prev, uint8_t length) {
+    _prefix_code * curr = _initialize_prefix_code(length);
+    uint8_t prev_bytes = prev->length / 8 + (prev->length % 8 == 0 ? 0 : 1);
+    for (int i = 0; i < prev_bytes; ++i)
+        curr->data[i] = prev->data[i];
+    
+    /* Increment current code.  */
+    uint8_t curr_bytes = length / 8 + (length % 8 == 0 ? 0 : 1);
+    for (int byte = curr_bytes - 1; byte >= 0; --byte) {
+        /* TODO.  */
+    }
+
+    return curr;
 }
 
 
@@ -313,7 +336,7 @@ _delete_prefix_code(_prefix_code * c) {
 
 
 
-// STATUS: todo.
+// STATUS: DEPRECATED.
 /* Codes queue functions.  */
 
 _codes_queue *
@@ -353,13 +376,4 @@ _dequeue_code(_codes_queue * cq) {
     cq->head = cq->head == 255 ? 0 : cq->head + 1;
     --(cq->size);
     return c;
-}
-
-
-
-/* Other.  */
-
-void
-_swap(_huffman_tree_node * p, _huffman_tree_node * q) {
-    /* TODO.  */
 }

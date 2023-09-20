@@ -1,4 +1,4 @@
-# Huffman coding
+# Huffman coding (work in progress)
 
 ## Description
 
@@ -70,5 +70,3 @@ The advantage of a canonical Huffman tree is that it can be encoded in fewer bit
 ## Links
 
 * [Canonical Huffman code - Wikipedia](https://en.wikipedia.org/wiki/Canonical_Huffman_code)
-
-
